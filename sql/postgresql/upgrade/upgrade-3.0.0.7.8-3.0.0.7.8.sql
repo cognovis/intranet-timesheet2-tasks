@@ -24,7 +24,6 @@ delete from im_views where view_id = 910;
 insert into im_views (view_id, view_name, visible_for) values (910, 'im_timesheet_task_list', 'view_projects');
 
 
-insert into im_views (view_id, view_name, visible_for) values (910, 'im_timesheet_task_list', 'view_projects');
 delete from im_view_columns where column_id >= 91000 and column_id < 91099;
 insert into im_view_columns (column_id, view_id, group_id, column_name, column_render_tcl,
 extra_select, extra_where, sort_order, visible_for) values (91000,910,NULL,'"Task Code"',
