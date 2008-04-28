@@ -28,8 +28,14 @@ BEGIN
 	order by
 		t.project_id
     loop
-	RAISE NOTICE ''create projects for tasks: task_nr=%, project_id=%'', 
-		row.task_nr, row.project_id;
+	RAISE NOTICE ''create projects for tasks: task_nr=%, project_id=%'', row.task_nr, row.project_id;
+
+        -- Make project_name unique in case of duplicates
+        v_name := row.task_name;
+	select	count(*) into v_count from im_projects p
+	where	p.project_name = v_name and p.company_id = row.company_id;
+        IF v_count > 0 THEN v_name := v_name || '' '' || row.task_id; END IF;
+
 	insert into im_projects (
 		project_id, project_name, project_nr,
 		project_path, parent_id, company_id,
@@ -37,7 +43,7 @@ BEGIN
 		description,
 		percent_completed
 	) values (
-		row.task_id, row.task_name, substring(row.task_nr from 1 for 80) || row.project_id::varchar,
+		row.task_id, v_name, substring(row.task_nr from 1 for 80) || row.project_id::varchar,
 		substring(row.task_nr from 1 for 80) || row.project_id::varchar, row.project_id, row.company_id,
 		100, 76,
 		row.description,
