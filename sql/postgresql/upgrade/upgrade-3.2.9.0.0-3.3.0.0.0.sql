@@ -3,7 +3,22 @@
 SELECT acs_log__debug('/packages/intranet-timesheet2-tasks/sql/postgresql/upgrade/upgrade-3.2.9.0.0-3.3.0.0.0.sql','');
 
 
-drop view im_timesheet_tasks_view;
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from pg_views
+        where lower(viewname) = ''im_timesheet_tasks_view'';
+        IF v_count = 0 THEN return 0; END IF;
+
+	drop view im_timesheet_tasks_view;
+
+        return v_count;
+end;' language 'plpgsql';
+SELECT inline_0();
+DROP FUNCTION inline_0();
+
 
 create or replace view im_timesheet_tasks_view as
 select  t.*,
