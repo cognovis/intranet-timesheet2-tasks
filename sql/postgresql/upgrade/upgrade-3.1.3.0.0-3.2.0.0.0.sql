@@ -19,6 +19,7 @@ returns integer as '
 DECLARE
         row		RECORD;
 	v_count		integer;
+	v_name		varchar;
 BEGIN
     select count(*) into v_count from user_tab_columns
     where lower(table_name) = ''im_timesheet_tasks'' and lower(column_name) = ''project_id'';
@@ -469,7 +470,6 @@ select
 	t.invoice_id,
 	t.priority,
 	t.sort_order,
-	t.gantt_project_id,
         p.parent_id as project_id,
         p.project_name as task_name,
         p.project_nr as task_nr,
