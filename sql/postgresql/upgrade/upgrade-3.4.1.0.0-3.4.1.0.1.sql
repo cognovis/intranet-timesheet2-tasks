@@ -137,12 +137,20 @@ END; $body$ LANGUAGE 'plpgsql';
 
 
 
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from im_dynfield_widgets
+        where widget_name = ''open_projects'';
+        IF v_count > 0 THEN return 1; END IF;
 
-SELECT im_dynfield_widget__new (
-	null, 'im_dynfield_widget', now(), 0, '0.0.0.0', null,
-	'open_projects', 'Open Projects', 'Open Projects',
-	10007, 'integer', 'generic_sql', 'integer',
-	'{custom {sql {
+	SELECT im_dynfield_widget__new (
+	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
+	''open_projects'', ''Open Projects'', ''Open Projects'',
+	10007, ''integer'', ''generic_sql'', ''integer'',
+	''{custom {sql {
 		select	p.project_id,
 			im_project_level_spaces(tree_level(p.tree_sortkey)) || p.project_name
 		from	im_projects p
@@ -153,8 +161,14 @@ SELECT im_dynfield_widget__new (
 			p.project_type_id not in (select * from im_sub_categories(2502))
 		order by 
 			tree_sortkey
-	}}}'
-);
+	}}}''
+	);
+
+end;' language 'plpgsql';
+select inline_0 ();
+drop function inline_0 ();
+
+
 
 
 
