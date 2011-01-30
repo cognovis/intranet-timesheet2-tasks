@@ -24,40 +24,101 @@ extra_select, extra_where, sort_order, visible_for) values (91002,910,NULL,'"Tas
 -----------------------------------------------------------
 -- Dynfield Widgets
 --
-SELECT im_dynfield_widget__new (
-	null, 'im_dynfield_widget', now(), 0, '0.0.0.0', null,
-	'project_status', 'Project Status', 'Projop Status',
-	10007, 'integer', 'im_category_tree', 'integer',
-	'{custom {category_type "Intranet Project Status"}}'
-);
 
-SELECT im_dynfield_widget__new (
-	null, 'im_dynfield_widget', now(), 0, '0.0.0.0', null,
-	'project_type', 'Project Type', 'Projop Type',
-	10007, 'integer', 'im_category_tree', 'integer',
-	'{custom {category_type "Intranet Project Type"}}'
-);
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from im_dynfield_widgets
+        where widget_name = ''project_status'';
+        IF v_count > 0 THEN return 1; END IF;
 
-SELECT im_dynfield_widget__new (
-	null, 'im_dynfield_widget', now(), 0, '0.0.0.0', null,
-	'units_of_measure', 'Units of Measure', 'Units of Measure',
-	10007, 'integer', 'im_category_tree', 'integer',
-	'{custom {category_type "Intranet UoM"}}'
-);
+	SELECT im_dynfield_widget__new (
+	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
+	''project_status'', ''Project Status'', ''Projop Status'',
+	10007, ''integer'', ''im_category_tree'', ''integer'',
+	''{custom {category_type "Intranet Project Status"}}''
+	);
 
-SELECT im_dynfield_widget__new (
-	null, 'im_dynfield_widget', now(), 0, '0.0.0.0', null,
-	'materials', 'Materials', 'Materials',
-	10007, 'integer', 'generic_sql', 'integer',
-	'{custom {sql {
+end;' language 'plpgsql';
+select inline_0 ();
+drop function inline_0 ();
+
+
+
+
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from im_dynfield_widgets
+        where widget_name = ''project_type'';
+        IF v_count > 0 THEN return 1; END IF;
+
+	SELECT im_dynfield_widget__new (
+	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
+	''project_type'', ''Project Type'', ''Projop Type'',
+	10007, ''integer'', ''im_category_tree'', ''integer'',
+	''{custom {category_type "Intranet Project Type"}}''
+	);
+
+
+end;' language 'plpgsql';
+select inline_0 ();
+drop function inline_0 ();
+
+
+
+
+
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from im_dynfield_widgets
+        where widget_name = ''units_of_measure'';
+        IF v_count > 0 THEN return 1; END IF;
+
+	SELECT im_dynfield_widget__new (
+	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
+	''units_of_measure'', ''Units of Measure'', ''Units of Measure'',
+	10007, ''integer'', ''im_category_tree'', ''integer'',
+	''{custom {category_type "Intranet UoM"}}''
+	);
+
+end;' language 'plpgsql';
+select inline_0 ();
+drop function inline_0 ();
+
+
+create or replace function inline_0 ()
+returns integer as '
+declare
+        v_count         integer;
+begin
+        select count(*) into v_count from im_dynfield_widgets
+        where widget_name = ''materials'';
+        IF v_count > 0 THEN return 1; END IF;
+
+	SELECT im_dynfield_widget__new (
+	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
+	''materials'', ''Materials'', ''Materials'',
+	10007, ''integer'', ''generic_sql'', ''integer'',
+	''{custom {sql {
 		select	m.material_id,
 			m.material_name
 		from	im_materials m
 		where	m.material_status_id not in (select * from im_sub_categories(9102))
 		order by 
 			lower(material_name) 
-	}}}'
-);
+	}}}''
+	);
+end;' language 'plpgsql';
+select inline_0 ();
+drop function inline_0 ();
 
 
 CREATE or REPLACE FUNCTION im_project_level_spaces(integer)
@@ -73,6 +134,8 @@ BEGIN
 	END LOOP;
 	RETURN v_result;
 END; $body$ LANGUAGE 'plpgsql';
+
+
 
 
 SELECT im_dynfield_widget__new (
