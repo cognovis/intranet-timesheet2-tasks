@@ -34,7 +34,7 @@ begin
         where widget_name = ''project_status'';
         IF v_count > 0 THEN return 1; END IF;
 
-	SELECT im_dynfield_widget__new (
+	PERFORM im_dynfield_widget__new (
 	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
 	''project_status'', ''Project Status'', ''Projop Status'',
 	10007, ''integer'', ''im_category_tree'', ''integer'',
@@ -57,7 +57,7 @@ begin
         where widget_name = ''project_type'';
         IF v_count > 0 THEN return 1; END IF;
 
-	SELECT im_dynfield_widget__new (
+	PERFORM im_dynfield_widget__new (
 	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
 	''project_type'', ''Project Type'', ''Projop Type'',
 	10007, ''integer'', ''im_category_tree'', ''integer'',
@@ -82,7 +82,7 @@ begin
         where widget_name = ''units_of_measure'';
         IF v_count > 0 THEN return 1; END IF;
 
-	SELECT im_dynfield_widget__new (
+	PERFORM im_dynfield_widget__new (
 	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
 	''units_of_measure'', ''Units of Measure'', ''Units of Measure'',
 	10007, ''integer'', ''im_category_tree'', ''integer'',
@@ -103,7 +103,7 @@ begin
         where widget_name = ''materials'';
         IF v_count > 0 THEN return 1; END IF;
 
-	SELECT im_dynfield_widget__new (
+	PERFORM im_dynfield_widget__new (
 	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
 	''materials'', ''Materials'', ''Materials'',
 	10007, ''integer'', ''generic_sql'', ''integer'',
@@ -146,7 +146,7 @@ begin
         where widget_name = ''open_projects'';
         IF v_count > 0 THEN return 1; END IF;
 
-	SELECT im_dynfield_widget__new (
+	PERFORM im_dynfield_widget__new (
 	null, ''im_dynfield_widget'', now(), 0, ''0.0.0.0'', null,
 	''open_projects'', ''Open Projects'', ''Open Projects'',
 	10007, ''integer'', ''generic_sql'', ''integer'',
