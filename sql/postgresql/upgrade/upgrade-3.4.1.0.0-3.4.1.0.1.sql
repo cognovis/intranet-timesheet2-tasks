@@ -40,7 +40,7 @@ begin
 	10007, ''integer'', ''im_category_tree'', ''integer'',
 	''{custom {category_type "Intranet Project Status"}}''
 	);
-
+	return 1;
 end;' language 'plpgsql';
 select inline_0 ();
 drop function inline_0 ();
@@ -63,7 +63,7 @@ begin
 	10007, ''integer'', ''im_category_tree'', ''integer'',
 	''{custom {category_type "Intranet Project Type"}}''
 	);
-
+	return 1; 
 
 end;' language 'plpgsql';
 select inline_0 ();
@@ -88,6 +88,7 @@ begin
 	10007, ''integer'', ''im_category_tree'', ''integer'',
 	''{custom {category_type "Intranet UoM"}}''
 	);
+	return 1; 
 
 end;' language 'plpgsql';
 select inline_0 ();
@@ -116,6 +117,7 @@ begin
 			lower(material_name) 
 	}}}''
 	);
+	return 1; 
 end;' language 'plpgsql';
 select inline_0 ();
 drop function inline_0 ();
@@ -163,7 +165,7 @@ begin
 			tree_sortkey
 	}}}''
 	);
-
+	return 1;
 end;' language 'plpgsql';
 select inline_0 ();
 drop function inline_0 ();
