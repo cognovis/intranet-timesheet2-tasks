@@ -7,8 +7,8 @@
 
 ad_library {
     @author frank.bergmann@project-open.com
+    @author Malte Sussdorff (malte.sussdorff@cognovis.de)
 }
-
 
 # ----------------------------------------------------------------------
 # Category Constants
@@ -19,6 +19,8 @@ ad_library {
 #
 ad_proc -public im_timesheet_task_status_active { } { return 9600 }
 ad_proc -public im_timesheet_task_status_inactive { } { return 9602 }
+ad_proc -public im_timesheet_task_status_closed { } { return 9601 }
+ad_proc -public im_timesheet_task_status_potential { } { return 9610 }
 
 # Task Type
 # 9500-9549    Timesheet Task Type
@@ -121,7 +123,7 @@ ad_proc -private im_timesheet_task_type_options {
     set options [db_list_of_lists task_type_options "
         select	category, category_id
         from	im_categories
-	where	category_type = 'Intranet Project Type' and
+	where	category_type = 'Intranet Timesheet Task Type' and
 		category_id in ([join [im_sub_categories [im_project_type_task]] ","]) and
 		(enabled_p is null OR enabled_p = 't')
     "]
@@ -135,7 +137,7 @@ ad_proc -private im_timesheet_task_status_options { {-include_empty 1} } {
     set options [db_list_of_lists task_status_options "
 	select	category, category_id
 	from	im_categories
-	where	category_type = 'Intranet Project Status' and
+	where	category_type = 'Intranet Timesheet Task Status' and
 		(enabled_p is null OR enabled_p = 't')
     "]
     if {$include_empty} { set options [linsert $options 0 { "" "" }] }
@@ -151,11 +153,13 @@ ad_proc -private im_timesheet_task_status_options { {-include_empty 1} } {
 ad_proc -public im_timesheet_task_list_component {
     {-debug 0}
     {-view_name "im_timesheet_task_list"} 
+    {-view_type ""}
     {-order_by ""} 
     {-restrict_to_type_id 0} 
     {-restrict_to_status_id 0} 
     {-restrict_to_material_id 0} 
     {-restrict_to_project_id 0} 
+    {-restrict_to_project_status_ids ""} 
     {-restrict_to_mine_p "all"} 
     {-restrict_to_with_member_id ""} 
     {-restrict_to_cost_center_id ""} 
@@ -171,12 +175,12 @@ ad_proc -public im_timesheet_task_list_component {
     # ---------------------- Security - Show the comp? -------------------------------
     set user_id [ad_get_user_id]
     set user_is_admin_p [im_is_user_site_wide_or_intranet_admin $user_id]
-
+    
     set include_subprojects 0
-
+    
     # Is this a "Consulting Project"?
     if {0 != $restrict_to_project_id} {
-	if {![im_project_has_type $restrict_to_project_id "Consulting Project"]} { return "" }
+        if {![im_project_has_type $restrict_to_project_id "Consulting Project"]} { return "" }
     }
 
     # Compatibibilty with older versions
@@ -189,31 +193,31 @@ ad_proc -public im_timesheet_task_list_component {
 	    set order_by [parameter::get_from_package_key -package_key intranet-timesheet2-tasks -parameter TaskListDetailsDefaultSortOrder -default "sort_order"] 
 	}
     }
-
+    
     # URL to toggle open/closed tree
     set open_close_url "/intranet/biz-object-tree-open-close"    
-
+    
     # Check vertical permissions - Is this user allowed to see TS stuff at all?
     if {![im_permission $user_id "view_timesheet_tasks"]} { return "" }
-
+    
     # Check if the user can see all timesheet tasks
     if {![im_permission $user_id "view_timesheet_tasks_all"]} { set restrict_to_mine_p "mine" }
-
+    
     # Check horizontal permissions -
     # Is the user allowed to see this project?
     im_project_permissions $user_id $restrict_to_project_id view read write admin
     if {!$read && ![im_permission $user_id view_timesheet_tasks_all]} { return ""}
-
+    
     # Is the current user allowed to edit the timesheet task hours?
     set edit_task_estimates_p [im_permission $user_id edit_timesheet_task_estimates]
-
+    
     # ---------------------- Defaults ----------------------------------
-
+    
     # Get parameters from HTTP session
     # Don't trust the container page to pass-on that value...
     set form_vars [ns_conn form]
     if {"" == $form_vars} { set form_vars [ns_set create] }
-
+    
     # Get the start_idx in case of pagination
     if {"" == $task_start_idx} {
 	set task_start_idx [ns_set get $form_vars "task_start_idx"]
@@ -224,23 +228,22 @@ ad_proc -public im_timesheet_task_list_component {
     set bgcolor(0) " class=roweven"
     set bgcolor(1) " class=rowodd"
     set date_format "YYYY-MM-DD"
-
     set timesheet_report_url [parameter::get -package_id [apm_package_id_from_key intranet-timesheet2-tasks] -parameter "TimesheetReportURL" -default "/intranet-timesheet2-tasks/report-timesheet"]
-    set current_url [im_url_with_query]
 
+    set current_url [im_url_with_query]
+    
     if {![info exists current_page_url]} { set current_page_url [ad_conn url] }
     if {![exists_and_not_null return_url]} { set return_url $current_url }
-
+    
     # Get the "view" (=list of columns to show)
     set view_id [util_memoize [list db_string get_view_id "select view_id from im_views where view_name = '$view_name'" -default 0]]
     if {0 == $view_id} {
-	ns_log Error "im_timesheet_task_component: we didn't find view_name=$view_name"
-	set view_name "im_timesheet_task_list"
-	set view_id [db_string get_view_id "select view_id from im_views where view_name=:view_name"]
+        ns_log Error "im_timesheet_task_component: we didn't find view_name=$view_name"
+        set view_id [db_string get_view_id "select view_id from im_views where view_name='im_timesheet_task_list'"]
     }
-    if {$debug} { ns_log Notice "im_timesheet_task_component: view_id=$view_id" }
-
-
+    if {$debug} { ns_log Debug "im_timesheet_task_component: view_id=$view_id" }
+    
+    
     # ---------------------- Get Columns ----------------------------------
     # Define the column headers and column contents that
     # we want to show:
@@ -251,7 +254,7 @@ ad_proc -public im_timesheet_task_list_component {
     set extra_selects [list]
     set extra_froms [list]
     set extra_wheres [list]
-
+    
     set column_sql "
 	select	*
 	from	im_view_columns
@@ -261,21 +264,20 @@ ad_proc -public im_timesheet_task_list_component {
     "
     set col_span 0
     db_foreach column_list_sql $column_sql {
-	if {"" == $visible_for || [eval $visible_for]} {
-	    lappend column_headers "$column_name"
-	    lappend column_vars "$column_render_tcl"
-	    lappend admin_links "<a href=[export_vars -base "/intranet/admin/views/new-column" {return_url column_id {form_mode edit}}] target=\"_blank\"><span class=\"icon_wrench_po\">[im_gif wrench]</span></a>"
-
-	    if {"" != $extra_select} { lappend extra_selects $extra_select }
-	    if {"" != $extra_from} { lappend extra_froms $extra_from }
-	    if {"" != $extra_where} { lappend extra_wheres $extra_where }
-	}
-	incr col_span
+        if {"" == $visible_for || [eval $visible_for]} {
+            lappend column_headers "$column_name"
+            lappend column_vars "$column_render_tcl"
+            lappend admin_links "<a href=[export_vars -base "/intranet/admin/views/new-column" {return_url column_id {form_mode edit}}] target=\"_blank\"><span class=\"icon_wrench_po\">[im_gif wrench]</span></a>"
+            
+            if {"" != $extra_select} { lappend extra_selects $extra_select }
+            if {"" != $extra_from} { lappend extra_froms $extra_from }
+            if {"" != $extra_where} { lappend extra_wheres $extra_where }
+        }
+        incr col_span
     }
-    if {$debug} { ns_log Notice "im_timesheet_task_component: column_headers=$column_headers" }
-
+    if {$debug} { ns_log Debug "im_timesheet_task_component: column_headers=$column_headers" }
     if {[string is integer $restrict_to_cost_center_id] && $restrict_to_cost_center_id > 0} {
-	lappend extra_wheres "(t.cost_center_id is null or t.cost_center_id = :restrict_to_cost_center_id)"
+        lappend extra_wheres "(t.cost_center_id is null or t.cost_center_id = :restrict_to_cost_center_id)"
     }
 
     if { "0" != $restrict_to_project_id } {
@@ -285,40 +287,40 @@ ad_proc -public im_timesheet_task_list_component {
     # -------- Compile the list of parameters to pass-through-------
     set form_vars [ns_conn form]
     if {"" == $form_vars} { set form_vars [ns_set create] }
-
+    
     set bind_vars [ns_set create]
     foreach var $export_var_list {
-	upvar 1 $var value
-	if { [info exists value] } {
-	    ns_set put $bind_vars $var $value
-	    if {$debug} { ns_log Notice "im_timesheet_task_component: $var <- $value" }
-	} else {
-	    set value [ns_set get $form_vars $var]
-	    if {![string equal "" $value]} {
- 		ns_set put $bind_vars $var $value
- 		if {$debug} { ns_log Notice "im_timesheet_task_component: $var <- $value" }
-	    }
-	}
+        upvar 1 $var value
+        if { [info exists value] } {
+            ns_set put $bind_vars $var $value
+            if {$debug} { ns_log Debug "im_timesheet_task_component: $var <- $value" }
+        } else {
+            set value [ns_set get $form_vars $var]
+            if {![string equal "" $value]} {
+                ns_set put $bind_vars $var $value
+                if {$debug} { ns_log Debug "im_timesheet_task_component: $var <- $value" }
+            }
+        }
     }
-
+    
     ns_set delkey $bind_vars "order_by"
     ns_set delkey $bind_vars "task_start_idx"
     set params [list]
     set len [ns_set size $bind_vars]
     for {set i 0} {$i < $len} {incr i} {
-	set key [ns_set key $bind_vars $i]
-	set value [ns_set value $bind_vars $i]
-	if {![string equal $value ""]} {
-	    lappend params "$key=[ns_urlencode $value]"
-	}
+        set key [ns_set key $bind_vars $i]
+        set value [ns_set value $bind_vars $i]
+        if {![string equal $value ""]} {
+            lappend params "$key=[ns_urlencode $value]"
+        }
     }
     set pass_through_vars_html [join $params "&"]
-
-
+    
+    
     # ---------------------- Format Header ----------------------------------
     # Set up colspan to be the number of headers + 1 for the # column
     set colspan [expr [llength $column_headers] + 1]
-
+    
     # Format the header names with links that modify the
     # sort order of the SQL query.
     #
@@ -326,24 +328,45 @@ ad_proc -public im_timesheet_task_list_component {
     set admin_link ""
     set table_header_html ""
     foreach col $column_headers {
-	set cmd_eval ""
-	if {$debug} { ns_log Notice "im_timesheet_task_component: eval=$cmd_eval $col" }
-	set cmd "set cmd_eval $col"
-	eval $cmd
-	regsub -all " " $cmd_eval "_" cmd_eval_subs
-	set cmd_eval [lang::message::lookup "" intranet-timesheet2-tasks.$cmd_eval_subs $cmd_eval]
-	if {$user_is_admin_p} { set admin_link [lindex $admin_links $col_ctr] }
-	append table_header_html "  <th class=rowtitle>$cmd_eval$admin_link</th>\n"
-	incr col_ctr
+        set cmd_eval ""
+        if {$debug} { ns_log Debug "im_timesheet_task_component: eval=$cmd_eval $col" }
+        set cmd "set cmd_eval $col"
+        eval $cmd
+        regsub -all " " $cmd_eval "_" cmd_eval_subs
+        set cmd_eval [lang::message::lookup "" intranet-timesheet2-tasks.$cmd_eval_subs $cmd_eval]
+        if {$user_is_admin_p} { set admin_link [lindex $admin_links $col_ctr] }
+        append table_header_html "  <th class=rowtitle>$cmd_eval$admin_link</th>\n"
+        incr col_ctr
     }
-
+    
+    set table_header_html "
+	<thead>
+	    <tr class=tableheader>
+		$table_header_html
+	    </tr>
+	</thead>
+    "
     # ---------------------- Calculate the Children's restrictions -------------------------
     set criteria [list]
-
+    set task_criteria [list]
     if {[string is integer $restrict_to_status_id] && $restrict_to_status_id > 0} {
-	lappend criteria "p.project_status_id in ([join [im_sub_categories $restrict_to_status_id] ","])"
+        lappend extra_wheres "(t.task_status_id in ([join [im_sub_categories $restrict_to_status_id] ","]) or t.task_status_id is null)"
     }
 
+    # Make it possible to restrict the display to only e.g. open project's tasks
+    set project_status_sub_categories [list]
+    foreach restrict_to_project_status_id $restrict_to_project_status_ids {
+        if {[string is integer $restrict_to_project_status_id] && $restrict_to_project_status_id > 0} {
+            foreach category_id [im_sub_categories $restrict_to_project_status_id] {
+                lappend project_status_sub_categories $category_id
+            }
+        }
+    }
+    if {$project_status_sub_categories ne ""} {
+        lappend extra_wheres "parent.project_status_id in ([join $project_status_sub_categories ","])"
+        lappend extra_wheres "(child.project_status_id in ([join $project_status_sub_categories ","]) or child.project_type_id = 100)"
+    }
+    
     if {"mine" == $restrict_to_mine_p} {
 	lappend criteria "p.project_id in (
 		select	p.project_id
@@ -357,16 +380,16 @@ ad_proc -public im_timesheet_task_list_component {
     } 
 
     if {[string is integer $restrict_to_with_member_id] && $restrict_to_with_member_id > 0} {
-	lappend criteria "p.project_id in (select object_id_one from acs_rels where object_id_two = :restrict_to_with_member_id)"
+        lappend criteria "p.project_id in (select object_id_one from acs_rels where object_id_two = :restrict_to_with_member_id)"
     }
-
+    
     if {[string is integer $restrict_to_type_id] && $restrict_to_type_id > 0} {
-	lappend criteria "p.project_type_id in ([join [im_sub_categories $restrict_to_type_id] ","])"
+        lappend extra_wheres "(t.task_type_id in ([join [im_sub_categories $restrict_to_type_id] ","]) or t.task_type_id is null)"
     }
-
+    
     set restriction_clause [join $criteria "\n\tand "]
     if {"" != $restriction_clause} { 
-	set restriction_clause "and $restriction_clause" 
+        set restriction_clause "and $restriction_clause" 
     }
 
     set extra_select [join $extra_selects ",\n\t\t"]
@@ -379,7 +402,7 @@ ad_proc -public im_timesheet_task_list_component {
     if { ![empty_string_p $extra_where] } { set extra_where " and \n\t$extra_where" }
 
     # ---------------------- Inner Permission Query -------------------------
-
+    
     # Check permissions for showing subprojects
     set child_perm_sql "
 			select	p.* 
@@ -416,37 +439,37 @@ ad_proc -public im_timesheet_task_list_component {
     }
 
     # ---------------------- Get the SQL Query -------------------------
-
+    
     # Check if the table im_gantt_projects exists, and add it to the query
     if {[db_table_exists im_gantt_projects]} {
-	set gp_select "gp.*,"
-	set gp_from "left outer join im_gantt_projects gp on (gp.project_id = child.project_id)"
+        set gp_select "gp.*,"
+        set gp_from "left outer join im_gantt_projects gp on (gp.project_id = child.project_id)"
     } else {
-	set gp_select ""
-	set gp_from ""
+        set gp_select ""
+        set gp_from ""
     }
-
+    
     # Sorting: Create a sort_by_clause that returns a "sort_by_value".
     # This value is used to sort the hierarchical multirow.
 	
     switch $order_by {
-	sort_order { 
-	    # Order like the imported Gantt diagram (GanttProject or MS-Project)
-	    set order_by_clause "child.sort_order" 
-	}
-	start_date { 
-	    # Order by which tasks starts first
-	    set order_by_clause "child.start_date" 
-	}
-	project_name { 
-	    set order_by_clause "lower(child.project_name)" 
-	}
-	project_nr { 
-	    set order_by_clause "lower(child.project_nr)" 
-	}
-	default {
-	    set order_by_clause "''" 
-	}
+        sort_order { 
+            # Order like the imported Gantt diagram (GanttProject or MS-Project)
+            set order_by_clause "child.sort_order" 
+        }
+        start_date { 
+            # Order by which tasks starts first
+            set order_by_clause "child.start_date" 
+        }
+        project_name { 
+            set order_by_clause "lower(child.project_name)" 
+        }
+        project_nr { 
+            set order_by_clause "lower(child.project_nr)" 
+        }
+        default {
+            set order_by_clause "''" 
+        }
     }
 
     set sql "
@@ -471,7 +494,8 @@ ad_proc -public im_timesheet_task_list_component {
 		child.*,
 		child.project_nr as task_nr,
 		child.project_name as task_name,
-		child.project_status_id as task_status_id,
+		t.task_status_id as task_status_id,
+        im_category_from_id(t.task_status_id) as task_status,
 		child.project_type_id as task_type_id,
 		child.project_id as child_project_id,
 		child.parent_id as child_parent_id,
@@ -483,8 +507,8 @@ ad_proc -public im_timesheet_task_list_component {
 		child.project_id as subproject_id,
 		child.project_nr as subproject_nr,
 		child.project_name as subproject_name,
-		child.project_status_id as subproject_status_id,
-		im_category_from_id(child.project_status_id) as subproject_status,
+		t.task_status_id as subproject_status_id,
+		im_category_from_id(t.task_status_id) as subproject_status,
 		im_category_from_id(child.project_type_id) as subproject_type,
 		tree_level(child.tree_sortkey) - tree_level(parent.tree_sortkey) as subproject_level,
 		$order_by_clause as order_by_value
@@ -498,24 +522,30 @@ ad_proc -public im_timesheet_task_list_component {
 		$extra_from
 	where
 		child.tree_sortkey between parent.tree_sortkey and tree_right(parent.tree_sortkey) and
-		child.project_status_id not in ([im_project_status_deleted])
+                child.project_status_id not in ([im_project_status_deleted])
 		$extra_where
 	order by
 		child.tree_sortkey
     "
-
+    
+    # Callback before rendering
+    upvar page_title page_title
+    callback im_timesheet_task_list_before_render -view_name $view_name \
+        -view_type $view_type -sql $sql -table_header $page_title
+    
+    ns_log Debug "Running the renderere for timesheet tasks"
     db_multirow task_list_multirow task_list_sql $sql {
 	# Create a list list of all projects
 	set all_projects_hash($child_project_id) 1
 
 	# The list of projects that have a sub-project
         set parents_hash($child_parent_id) 1
-	ns_log Notice "im_timesheet_task_list_component: id=$project_id, nr=$project_nr, o=$order_by_value"
+	ns_log Debug "im_timesheet_task_list_component: id=$project_id, nr=$project_nr, o=$order_by_value"
     }
-
+    
     # Sort the tree according to the specified sort order
     # "sort_order" is an integer, so we have to tell the sort algorithm to use integer sorting
-    ns_log Notice "im_timesheet_task_list_component: starting to sort multirow"
+    ns_log Debug "im_timesheet_task_list_component: starting to sort multirow"
 
     if {[catch {
 	if {"sort_order" == $order_by} {
@@ -527,13 +557,13 @@ ad_proc -public im_timesheet_task_list_component {
 	ns_log Error "multirow_sort_tree: Error sorting: $err_msg"
 	return "<b>Error</b>:<pre>$err_msg</pre>"
     }
-    ns_log Notice "im_timesheet_task_list_component: finished to sort multirow"
+    ns_log Debug "im_timesheet_task_list_component: finished to sort multirow"
 
 
 
     # ----------------------------------------------------
     # Determine closed projects and their children
-
+    
     # Store results in hash array for faster join
     # Only store positive "closed" branches in the hash to save space+time.
     # Determine the sub-projects that are also closed.
@@ -555,23 +585,23 @@ ad_proc -public im_timesheet_task_list_component {
 		child.tree_sortkey between parent.tree_sortkey and tree_right(parent.tree_sortkey)
     "
     db_foreach oc_sub $oc_sub_sql {
-	set closed_projects_hash($child_id) 1
+        set closed_projects_hash($child_id) 1
     }
-
+    
     # Calculate the list of leaf projects
     set all_projects_list [array names all_projects_hash]
     set parents_list [array names parents_hash]
     set leafs_list [set_difference $all_projects_list $parents_list]
     foreach leaf_id $leafs_list { set leafs_hash($leaf_id) 1 }
-
+    
     if {$debug} { 
-	ns_log Notice "timesheet-tree: all_projects_list=$all_projects_list"
-	ns_log Notice "timesheet-tree: parents_list=$parents_list"
-	ns_log Notice "timesheet-tree: leafs_list=$leafs_list"
-	ns_log Notice "timesheet-tree: closed_projects_list=[array get closed_projects_hash]"
-	ns_log Notice "timesheet-tree: "
+        ns_log Debug "timesheet-tree: all_projects_list=$all_projects_list"
+        ns_log Debug "timesheet-tree: parents_list=$parents_list"
+        ns_log Debug "timesheet-tree: leafs_list=$leafs_list"
+        ns_log Debug "timesheet-tree: closed_projects_list=[array get closed_projects_hash]"
+        ns_log Debug "timesheet-tree: "
     }
-
+    
     # Render the multirow
     set table_body_html ""
     set ctr 0
@@ -585,7 +615,7 @@ ad_proc -public im_timesheet_task_list_component {
     # ----------------------------------------------------
     # Render the list of tasks
     template::multirow foreach task_list_multirow {
-
+        
 	# Skip this entry completely if the parent of this project is closed
 	if {[info exists closed_projects_hash($child_parent_id)]} { continue }
 
@@ -652,7 +682,7 @@ ad_proc -public im_timesheet_task_list_component {
 	switch $project_type_id {
 	    100 {
 		# Timesheet Task
-		set object_url [export_vars -base "/intranet-timesheet2-tasks/new" {{task_id $child_project_id} return_url}]
+		set object_url [export_vars -base "/intranet-timesheet2-tasks/view" {{task_id $child_project_id} return_url}]
 	    }
 	    101 {
 		# Ticket
@@ -668,7 +698,7 @@ ad_proc -public im_timesheet_task_list_component {
 	set percent_done_input "<input type=textbox size=3 name=percent_completed.$task_id value=$percent_completed_rounded>"
 	set billable_hours_input "<input type=textbox size=3 name=billable_units.$task_id value=$billable_units>"
         if { ![empty_string_p $task_id]} {
-            set status_select [im_category_select {Intranet Project Status} task_status_id.$task_id $task_status_id]
+            set status_select [im_category_select {Intranet Timesheet Task Status} task_status_id.$task_id $task_status_id]
         } else {
             set status_select ""
         }
@@ -736,17 +766,17 @@ ad_proc -public im_timesheet_task_list_component {
 	    }]
 	    break
 	}
-
     }
-
+    
     # ----------------------------------------------------
     # Show a reasonable message when there are no result rows:
     #
+    
+    set new_task_url [export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]
     if {[empty_string_p $table_body_html] && "" == $prev_page_url && "" == $next_page_url} {
-        set new_task_url [export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]
 	set table_body_html "
 		<tr class=table_list_page_plain>
-			<td colspan=$colspan align=left>
+        <td colspan=$colspan align=left>
 			<b>[_ intranet-timesheet2-tasks.There_are_no_active_tasks]</b>
 			</td>
 		</tr>
@@ -768,28 +798,13 @@ ad_proc -public im_timesheet_task_list_component {
     # -------------------------------------------------
     # Format the action bar at the bottom of the table
     #
-    set action_html "
-      <tr>
-	<td align='right' colspan='99'>
-	<div>
-	  <div style='float: right;'>
-		<select name=action>
-		<option value=save>[lang::message::lookup "" intranet-timesheet2-tasks.Save_Changes "Save Changes"]</option>
-		<option value=delete>[_ intranet-timesheet2-tasks.Delete]</option>
-		</select>
-		<input type=submit name=submit value='[_ intranet-timesheet2-tasks.Apply]'>
-	   </div>
-	</div>
-	</td>
-      </tr>
-    "
 
     set action_options [list]
     set new_timesheet_task_html ""
     if {$write} {
-	lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Save_Changes "Save Changes"] "save"]
-	lappend action_options [list [_ intranet-timesheet2-tasks.Delete] "delete"]
-	set new_timesheet_task_html "<a class='form-button40' href=\"[export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>"
+		lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Save_Changes "Save Changes"] "save"]
+		lappend action_options [list [_ intranet-timesheet2-tasks.Delete] "delete"]
+		set new_timesheet_task_html "<a class='form-button40' href=\"[export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>"
     }
 
     lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Close "Close"] "close" ]
@@ -913,7 +928,7 @@ ad_proc -public im_timesheet_task_info_component {
 		project_nr {
 		    label "[_ intranet-timesheet2-tasks.Task_Nr]"
 		    link_url_eval { 
-			[return "/intranet-timesheet2-tasks/new?[export_vars -url -override {{ task_id $id }} { return_url project_id } ]" ]
+			[return "/intranet-timesheet2-tasks/view?[export_vars -url -override {{ task_id $id }} { return_url project_id } ]" ]
 		    }
 		}
 		dependency_type {
@@ -1013,6 +1028,49 @@ ad_proc -public im_timesheet_task_members_component {
     return $html
 }
 
+# ----------------------------------------------------------------------
+# Timesheet Task Info Component
+# ---------------------------------------------------------------------
+
+
+ad_proc -public im_timesheet_task_info2_component {
+    task_id
+    return_url
+} {
+    
+
+    set params [list  [list base_url "/intranet-timesheet2-tasks/"]  [list task_id $task_id] [list return_url $return_url]]
+    
+    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/task-info"]
+
+    return [string trim $result]
+}
+
+
+
+# ----------------------------------------------------------------------
+# Home Tasks Component
+# ---------------------------------------------------------------------
+ad_proc -public im_timesheet_task_home_component {
+    {-page_size 20}
+    {-restrict_to_status_id 76}
+    {-return_url ""}
+} {
+
+    @creation-date 2011-01-12
+} {
+
+    # set the page variable (hopefully)
+    set page [ns_queryget page 1]
+    set orderby [ns_queryget orderby priority]
+    set params [list [list base_url "/intranet-timesheet2-tasks/"] [list page_size $page_size] [list restrict_to_status_id $restrict_to_status_id] [list orderby $orderby] [list page $page] [list return_url $return_url]]
+
+    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/home-tasks"]
+    return [string trim $result]
+}
+
+
+
 
 # -------------------------------------------------------------------
 # Calculate Project Advance
@@ -1041,19 +1099,18 @@ ad_proc im_timesheet_project_advance {
     # ----------------------------------------------------------------
     # Get the topmost project
     if {![db_0or1row main_project "
-	select	project_id as main_project_id,
-		project_type_id
-	from	im_projects
-	where	tree_sortkey = (
+    	select	project_id as main_project_id,
+	    	project_type_id
+      	from	im_projects
+	    where	tree_sortkey = (
 			select	tree_root_key(tree_sortkey)
 			from	im_projects
 			where	project_id = :project_id
 		)
     "]} {
-	ad_return_complaint 1 "Unable to find parent for project #$project_id"
-	ad_script_abort
+        ad_return_complaint 1 "Unable to find parent for project #$project_id"
+        ad_script_abort
     }
-
 
     # ----------------------------------------------------------------
     # Get the list of all sub-projects, tasks and tickets below the main_project
@@ -1180,11 +1237,13 @@ ad_proc im_timesheet_project_advance {
 			where project_id = :parid
 	    "
 	} else {
-	    db_dml update_project_advance "
+	    catch {
+		db_dml update_project_advance "
 			update im_projects set
 				percent_completed = (:advanced_sum::numeric / :planned_sum::numeric) * 100
 			where project_id = :parid
 	    "
+	    }
 	}
 
 	db_dml update_task_hours "
@@ -1198,7 +1257,6 @@ ad_proc im_timesheet_project_advance {
 	# Write audit trail
 	im_project_audit -project_id $parid
     }
-
 }
 
 
@@ -1269,3 +1327,63 @@ ad_proc -public im_timesheet_next_task_nr {
 }
 
 
+ad_proc -public -callback im_project_after_update -impl im_timesheet_tasks {
+    {-object_id:required}
+    {-status_id:required}
+} {
+    Updates tasks status on im_projects table according with im_timesheet_tasks table.
+} {
+
+    set closed_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_closed])"] 3600]
+    set active_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_active])"] 3600]
+    set inactive_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_inactive])"] 3600]
+    set potential_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_potential])"] 3600]
+
+    if {[lsearch $closed_status_ids $status_id] >=0} {
+	set project_status_id [im_project_status_closed]
+    } elseif {[lsearch $active_status_ids $status_id] >=0} {
+	set project_status_id [im_project_status_open]
+    } elseif {[lsearch $inactive_status_ids $status_id] >=0} {
+	set project_status_id [im_project_status_closed]
+    } elseif {[lsearch $potential_status_ids $status_id] >=0} {
+	set project_status_id [im_project_status_potential]
+    } else {
+	set project_status_id ""
+    }
+    
+    if {"" != $project_status_id} {
+	db_dml update " UPDATE im_projects SET project_status_id = :project_status_id  WHERE project_id = :object_id"
+    }
+}
+
+ad_proc -public im_timesheet_task_units { 
+    -project_id
+    {-type "planned"}
+} {
+    Return the planned hours for a project including the subprojects
+
+    @param project_id Project for which to calculate the planned units
+    @param type Billable or planned units
+} {
+    return [util_memoize [list im_timesheet_task_units_not_cached -project_id $project_id -type $type] 360]
+}
+
+ad_proc -public im_timesheet_task_units_not_cached { 
+    -project_id
+    {-type "planned"}
+} {
+    Return the planned units for a project including the subprojects not cached
+
+    @param project_id Project for which to calculate the planned units
+    @param type Billable or planned units
+} {
+    return [db_string planned_project_units "select to_char(sum(${type}_units),'9999999.0') from im_timesheet_tasks where task_id in (
+    select children.project_id
+      from im_projects parent, im_projects children
+    where
+      children.tree_sortkey between 
+      parent.tree_sortkey 
+      and tree_right(parent.tree_sortkey)
+      and parent.project_id = :project_id
+    )" -default ""]
+}

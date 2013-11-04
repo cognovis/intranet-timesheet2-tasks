@@ -14,6 +14,7 @@ ad_page_contract {
 } {
     { task_order_by "" }
     { view_name "im_timesheet_task_list" }
+    { view_type "" }
     { material_id:integer 0 }
     { project_id }
     { task_status_id 0 }
@@ -71,7 +72,7 @@ if { [empty_string_p $task_how_many] || $task_how_many < 1 } {
 # Admin Links
 # ---------------------------------------------------------------
 
-set admin_links "<li><a href=\"new?[export_url_vars project_id return_url]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>\n"
+set admin_links "<li><a href=\"new?[export_url_vars project_id task_status_id return_url]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>\n"
 
 append admin_links [im_menu_ul_list -no_uls 1 "timesheet_tasks" {}]
 
@@ -87,13 +88,14 @@ if {"" != $admin_links} {
 # Variables of this page to pass through im_task_component to maintain the
 # current selection and view of the current project
 
-set export_var_list [list task_order_by task_how_many view_name]
+set export_var_list [list task_order_by task_how_many view_name view_type]
 
 set task_content [im_timesheet_task_list_component \
 	-current_page_url		$current_url \
 	-return_url			$return_url \
 	-export_var_list		$export_var_list \
 	-view_name 			$view_name \
+	-view_type 			$view_type \
 	-order_by			$task_order_by \
 	-restrict_to_type_id		$task_type_id \
 	-restrict_to_status_id		$task_status_id \

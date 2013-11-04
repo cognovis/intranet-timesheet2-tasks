@@ -58,10 +58,19 @@ ad_form \
     -export {project_id return_url } \
     -form {
     	{mine_p:text(select),optional {label "Mine/All"} {options $mine_p_options }}
-	{task_status_id:text(im_category_tree),optional {label "[lang::message::lookup {} intranet-helpdesk.Status Status]"} {custom {category_type "Intranet Project Status" translate_p 1}} }
-	{with_member_id:text(select),optional {label "[lang::message::lookup {} intranet-helpdesk.With_Member {With Member}]"} {options $task_member_options} }
-	{cost_center_id:text(select),optional {label "[lang::message::lookup {} intranet-cost.Cost_Center {Cost Center}]"} {options $cost_center_options} }
+        {task_status_id:text(im_category_tree),optional {label "[lang::message::lookup {} intranet-helpdesk.Status Status]"} {custom {category_type "Intranet Timesheet Task Status" translate_p 1}} }
+        {with_member_id:text(select),optional {label "[lang::message::lookup {} intranet-helpdesk.With_Member {With Member}]"} {options $task_member_options} }
+        {cost_center_id:text(select),optional {label "[lang::message::lookup {} intranet-cost.Cost_Center {Cost Center}]"} {options $cost_center_options} }
     }
+
+# List to store the view_type_options
+set view_type_options [list [list HTML ""]]
+
+# Run callback to extend the filter and/or add items to the view_type_options
+callback im_timesheet_tasks_index_filter -form_id $form_id
+ad_form -extend -name $form_id -form {
+    {view_type:text(select),optional {label "#intranet-openoffice.View_type#"} {options $view_type_options}}
+}
 		
 template::element::set_value $form_id task_status_id $task_status_id
 template::element::set_value $form_id mine_p $mine_p
@@ -70,8 +79,10 @@ im_dynfield::append_attributes_to_form \
     -object_type $object_type \
     -form_id $form_id \
     -object_id 0 \
+    -object_subtype_id 9500 \
     -advanced_filter_p 1 \
     -search_p 1
+
 
 # Set the form values from the HTTP form variable frame
 im_dynfield::set_form_values_from_http -form_id $form_id
