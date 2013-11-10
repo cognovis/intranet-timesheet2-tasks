@@ -328,15 +328,20 @@ ad_proc -public im_timesheet_task_list_component {
     set admin_link ""
     set table_header_html ""
     foreach col $column_headers {
-        set cmd_eval ""
-        if {$debug} { ns_log Debug "im_timesheet_task_component: eval=$cmd_eval $col" }
-        set cmd "set cmd_eval $col"
-        eval $cmd
-        regsub -all " " $cmd_eval "_" cmd_eval_subs
-        set cmd_eval [lang::message::lookup "" intranet-timesheet2-tasks.$cmd_eval_subs $cmd_eval]
-        if {$user_is_admin_p} { set admin_link [lindex $admin_links $col_ctr] }
-        append table_header_html "  <th class=rowtitle>$cmd_eval$admin_link</th>\n"
-        incr col_ctr
+	set cmd_eval ""
+	if {$debug} { ns_log Notice "im_timesheet_task_component: eval=$cmd_eval $col" }
+	set cmd "set cmd_eval $col"
+	eval $cmd
+	regsub -all " " $cmd_eval "_" cmd_eval_subs
+
+	# Only localize "reasonable" strings...
+	if {[regexp {^[a-zA-Z0-9_]+$} $cmd_eval_subs]} {
+	    set cmd_eval [lang::message::lookup "" intranet-timesheet2-tasks.$cmd_eval_subs $cmd_eval]
+	}
+
+	if {$user_is_admin_p} { set admin_link [lindex $admin_links $col_ctr] }
+	append table_header_html "  <th class=rowtitle>$cmd_eval$admin_link</th>\n"
+	incr col_ctr
     }
     
     set table_header_html "
