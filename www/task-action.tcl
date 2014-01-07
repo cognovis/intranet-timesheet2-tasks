@@ -230,10 +230,22 @@ switch $action {
 	}
     	if {[catch {
 	    foreach del_task_id $delete_task_list {
+
+		set task_parent_id [db_string task_parent_id "select parent_id from im_projects where project_id = :del_task_id" -default ""]
+		if {"" == $task_parent_id} {
+		    # Found the main project. We don't want to delete this project.
+		    continue 
+		}
+
 		# Write Audit Trail
 		im_project_audit -action before_nuke -project_id $del_task_id
+
 		# Delete the task
+		if {[im_table_exists im_events]} {
+		    db_dml del_tasks_events "update im_events set event_timesheet_task_id = null where event_timesheet_task_id = :del_task_id"
+		}
 		db_string del_task "SELECT im_timesheet_task__delete(:del_task_id)"
+
 	    }
 	} errmsg]} {
 	    set task_names [join $delete_task_list "<li>"]
