@@ -17,7 +17,6 @@ ad_page_contract {
     { edit_p "" }
     { message "" }
     { task_type_id "9500"}
-    { form_mode "display" }
     { task_status_id:integer 76 }
 
     {submit_continue_tasklist ""}
@@ -35,7 +34,6 @@ set focus "task.var_name"
 set page_title [_ intranet-timesheet2-tasks.New_Timesheet_Task]
 set base_component_title [_ intranet-timesheet2-tasks.Timesheet_Task]
 set context [list $page_title]
-if {"" == $return_url} { set return_url [im_url_with_query] }
 set current_user_id $user_id
 
 set normalize_project_nr_p [parameter::get_from_package_key -package_key "intranet-core" -parameter "NormalizeProjectNrP" -default 1]
@@ -67,16 +65,16 @@ if {[info exists task_id]} {
 # Check the case if there is no project specified. 
 # This is only OK if there is a task_id specified (new task for project).
 if {0 == $project_id} {
-
     if {[info exists task_id]} {
-	set project_id [db_string project_from_task "select project_id from im_timesheet_tasks_view where task_id = :task_id" -default 0]
-	if {$return_url eq ""} {
-	    set return_url [export_vars -base "/intranet/projects/view" {project_id}]
-	}
+        set project_id [db_string project_from_task "select project_id from im_timesheet_tasks_view where task_id = :task_id" -default 0]
     } else {
-	ad_return_complaint 1 "You need to specify atleast a task or a project"
-	return
+        ad_return_complaint 1 "You need to specify atleast a task or a project"
+        return
     }
+}
+
+if {$return_url eq ""} {
+    set return_url [export_vars -base "/intranet/projects/view" {project_id}]
 }
 
 set ::super_project_id $project_id
@@ -236,7 +234,6 @@ ad_form \
     -actions $actions \
     -has_edit $form_has_edit_p \
     -has_submit 0 \
-    -mode $form_mode \
     -export {next_url user_id return_url} \
     -form {
 	task_id:key
@@ -258,13 +255,12 @@ im_dynfield::append_attributes_to_form \
     -object_subtype_id $task_type_id
 
 # Add two different Submit buttons
-if {"display" != $form_mode} {
-    ad_form -extend -name task -form {
+ad_form -extend -name task -form {
 	{submit_continue_tasklist:text(submit) {label "[lang::message::lookup {} intranet-timesheet2-tasks.Submit_return_to_task_list {Submit and return to main project}]" }}
 	{submit_continue_edit:text(submit) {label "[lang::message::lookup {} intranet-timesheet2-tasks.Submit_continue_to_edit_task {Submit and continue to work with task}]" }}
 	{submit_cancel:text(submit) {label "[lang::message::lookup {} intranet-timesheet2-tasks.Cancel Cancel]" }}
-    }
 }
+
 
 # Set default type to "Task"
 
@@ -451,7 +447,7 @@ ad_form -extend -name task -on_request {
 	}
 	"continue_edit" {
 	    # Continue on to the new task
-	    set task_url [export_vars -base "/intranet-timesheet2-tasks/new" {task_id}]
+	    set task_url [export_vars -base "/intranet-timesheet2-tasks/view" {task_id}]
 	    ad_returnredirect $task_url
 	}
 	default {
