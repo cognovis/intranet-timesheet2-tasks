@@ -29,20 +29,18 @@ ad_page_contract {
     return_url
 }
 
+
 # ----------------------------------------------------------------------
 # Permissions
 # ---------------------------------------------------------------------
 
 set org_project_id $project_id
-
 set current_user_id [ad_maybe_redirect_for_registration]
-
 set all_task_list [array names task_id]
 # Append dummy task in case the list is empty
 lappend all_task_list 0
-set all_task_list [concat $all_task_list [array names percent_completed]]
+set all_task_list [concat $all_task_list [array names task_status_id]]
 ns_log Notice "task-action: all_task_list=$all_task_list"
-
 
 set task_mark_as_closed_workflow_key "task_close_approval_wf"
 
@@ -51,23 +49,24 @@ set task_mark_as_closed_workflow_key "task_close_approval_wf"
 # Batch-process the tasks
 # ---------------------------------------------------------------------
 
+# Get permissions for the main project
+im_project_permissions $current_user_id $project_id view read write admin
+set edit_task_estimates_p [im_permission $current_user_id edit_timesheet_task_estimates]
+set edit_task_completion_p [im_permission $current_user_id edit_timesheet_task_completion]
+
+
 set error_list [list]
 switch $action {
-
     save {
-
-	# Check permissions on the enclosing project
-	im_timesheet_task_permissions $current_user_id $project_id view read write admin
-	if {!$write} {
-	    ad_return_complaint 1 "<li>[_ intranet-core.lt_You_have_insufficient_6]"
-	    ad_script_abort
-	}
-
-	set perc_task_list [array names percent_completed]
+	set perc_task_list [array names task_status_id]
 	foreach save_task_id $perc_task_list {
 
 	    set task_name [db_string tname "select project_name from im_projects where project_id = :save_task_id" -default ""]
-	    set completed $percent_completed($save_task_id)
+	    set assigned_member_p [db_string assigned_member_p "select count(*) from acs_rels where object_id_one = :save_task_id and object_id_two = :current_user_id" -default 0]
+	    set completed ""
+	    if {[info exists percent_completed($save_task_id)]} {
+		set completed $percent_completed($save_task_id)
+	    }
 	    set start_date_ansi ""
 	    set end_date_ansi ""
 
@@ -84,7 +83,7 @@ switch $action {
             }
 
 	    # start date > end date ?  
-            if { "" != $end_date_ansi && "" != $end_date_ansi } {
+            if { "" != $start_date_ansi && "" != $end_date_ansi } {
 		# fraber 120425: https://sourceforge.net/projects/project-open/forums/forum/295937/topic/5217586
 		# Adding default values to avoid errors
 		if {![info exists start_date($save_task_id)]} { set start_date($save_task_id) "undefined" }
@@ -94,7 +93,6 @@ switch $action {
 		    ad_script_abort
                 }
             }
-
 
 	    if {"" != $completed} {
 		if {$completed > 100 || $completed < 0} {
@@ -128,67 +126,66 @@ switch $action {
 	    }
 
 	    if {[catch {
-		db_dml save_tasks_to_project "
+
+		# Exception: Allow to write %completed to certain assigned users
+		if {$write || ($assigned_member_p && $edit_task_completion_p)} {
+		    db_dml save_tasks_to_project "
 			update	im_projects
 			set	percent_completed = :completed
 			where	project_id = :save_task_id
-		"
+		    "
+		}
 
-		if {"" != $planned || "" != $billable} {
-		    db_dml save_tasks_to_ts_task "
+		# Writing any other values requires write permissions on the main project:
+		if {$write} {
+		    if {"" != $planned || "" != $billable} {
+			db_dml save_tasks_to_ts_task "
 			update	im_timesheet_tasks
 			set	planned_units = :planned,
 				billable_units = :billable
 			where	task_id = :save_task_id
-		    "
-		}
+		        "
+		    }
 
-		if {"" != $status_id} {
-		    db_dml save_project_status "
+		    if {"" != $status_id} {
+			db_dml save_project_status "
 			update	im_projects
 			set	project_status_id = :status_id
 			where	project_id = :save_task_id
-		    "
-		}
+		        "
+		    }
 
-		# Writing Start Date 
-		if { "" != $start_date_ansi } {
+		    # Writing Start Date 
+		    if { "" != $start_date_ansi } {
                 	db_dml save_project_start_date "
                         	update  im_projects
 	                        set     start_date = '$start_date_ansi'
                                 where   project_id = :save_task_id
         	         "
-		} else {
+		    } else {
 			db_dml save_project_start_date "
                			update  im_projects
 			        set     start_date = NULL
         		        where   project_id = :save_task_id
                		 "
-		}
+		    }
 
-		# Writing End Date 
-                if { "" != $end_date_ansi } {
+		    # Writing End Date 
+		    if { "" != $end_date_ansi } {
                         db_dml save_project_end_date "
                                 update  im_projects
                                 set     end_date = '$end_date_ansi'
                                 where   project_id = :save_task_id
                          "
-                } else {
+		    } else {
                         db_dml save_project_end_date "
                                 update  im_projects
                                 set     end_date = NULL
                                 where   project_id = :save_task_id
                          "
-                }
+		    }
 
-
-#                if { [info exists end_date($save_task_id)] } {
-#                    db_dml save_project_end_date "
-#                        update  im_projects
-#                        set     end_date = :end_date($save_task_id)
-#                        where   project_id = :save_task_id
-#                    "
-#                }
+		}
 
 	    } errmsg]} {
 		ad_return_complaint 1 "<li>[lang::message::lookup "" intranet-timesheet2-tasks.Unable_Update_Task "Unable to update task:<br><pre>$errmsg</pre>"]"
@@ -197,15 +194,11 @@ switch $action {
 
 	    # Audit the action
 	    im_project_audit -action after_update -project_id $save_task_id
-    
-
 	}
     }
 
     delete {
-
 	# Check permissions on the enclosing project
-	im_timesheet_task_permissions $current_user_id $project_id view read write admin
 	if {!$write} {
 	    ad_return_complaint 1 "<li>[_ intranet-core.lt_You_have_insufficient_6]"
 	    ad_script_abort
@@ -244,6 +237,13 @@ switch $action {
 		if {[im_table_exists im_events]} {
 		    db_dml del_tasks_events "update im_events set event_timesheet_task_id = null where event_timesheet_task_id = :del_task_id"
 		}
+		if {[im_table_exists im_gantt_assignments]} {
+		    set rel_ids [db_list gantt_rel_ids "select r.rel_id from acs_rels r, im_gantt_assignments ga where r.rel_id = ga.rel_id and (r.object_id_one = :del_task_id OR r.object_id_two = :del_task_id)"]
+		    foreach rel_id $rel_ids {
+			db_dml del_tasks_assignments "delete from im_gantt_assignments where rel_id = :rel_id"
+			db_dml del_tasks_assignment_timephases "delete from im_gantt_assignment_timephases where rel_id = :rel_id"
+		    }
+		}
 		db_string del_task "SELECT im_timesheet_task__delete(:del_task_id)"
 
 	    }
@@ -256,19 +256,12 @@ switch $action {
 	}
     }
 
-
     close {
-	
 	# Close the task if permissions are OK, or start a workflow
 	set mark_as_done_html ""
 	set task_list [array names task_id]
 	set task_names [join $task_list "<li>"]
 	if {0 == [llength $task_list]} { ad_returnredirect $return_url }
-
-
-	# Check permissions of the task
-	im_timesheet_task_permissions $current_user_id $project_id view read write admin
-	# We explicitely deal with permissions further below in the code
 
 	set task_list_sql "
 		select	p.project_id,

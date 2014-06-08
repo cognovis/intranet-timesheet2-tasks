@@ -343,6 +343,7 @@ ad_form -extend -name task -on_request {
     if {[catch {
 
 	db_string task_insert {}
+	db_dml project_update {}
 
         im_dynfield::attribute_store \
             -object_type "im_timesheet_task" \
@@ -361,19 +362,14 @@ ad_form -extend -name task -on_request {
 			im_biz_object_members bom
 		where	r.rel_id = bom.rel_id and
 			object_id_one = :project_id
-	    "
-	    db_foreach members $member_sql {
-		im_biz_object_add_role $user_id $task_id $role_id
-	    }
+	"
+	db_foreach members $member_sql {
+	    im_biz_object_add_role $user_id $task_id $role_id
 	}
-
-	# Write Audit Trail
-	im_project_audit -project_id $task_id -action after_create
-
-    } err_msg]} {
-	ad_return_complaint 1 "<b>Error inserting new task</b>:
-	<pre>$err_msg</pre>"
     }
+
+    # Write Audit Trail
+    im_project_audit -project_id $task_id -action after_create
 
     # Update percent_completed
     im_timesheet_project_advance $task_id
@@ -390,7 +386,8 @@ ad_form -extend -name task -on_request {
         -notif_subject "New Task: $task_name" \
         -notif_html "<h1><a href='$task_url'>$task_name</h1><p /><div align=left>[string trim $result]</div>"
 
-
+    # Reset the time_phase date for this relationship
+    im_biz_object_delete_timephased_data -task_id $task_id
 
 } -edit_data {
 
@@ -409,6 +406,9 @@ ad_form -extend -name task -on_request {
 	-object_type "im_timesheet_task" \
 	-object_id $task_id \
 	-form_id task
+
+    # Write Audit Trail
+    im_project_audit -project_id $task_id -action after_update
 
     # Update percent_completed
     im_timesheet_project_advance $task_id
@@ -455,10 +455,6 @@ ad_form -extend -name task -on_request {
 	}
     }
 } -validate {
-    {task_nr
-	{ [string length $task_nr] < 30 }
-	"[lang::message::lookup {} intranet-timesheet2-tasks.Short_Name_too_long {Short Name too long (max 30 characters).}]" 
-    }
     {task_nr
 	{ [regexp {^[a-zA-Z0-9_]+$} $task_nr match] }
 	"Short Name contains non-alphanum characters." 

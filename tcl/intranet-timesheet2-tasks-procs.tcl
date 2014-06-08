@@ -72,7 +72,7 @@ ad_proc -public im_timesheet_task_dependency_hardness_type_hard { } { return 955
 ad_proc -public im_package_timesheet_task_id {} {
     Returns the package id of the intranet-timesheet2-tasks module
 } {
-    return [util_memoize "im_package_timesheet_task_id_helper"]
+    return [util_memoize im_package_timesheet_task_id_helper]
 }
 
 ad_proc -private im_package_timesheet_task_id_helper {} {
@@ -175,7 +175,9 @@ ad_proc -public im_timesheet_task_list_component {
     # ---------------------- Security - Show the comp? -------------------------------
     set user_id [ad_get_user_id]
     set user_is_admin_p [im_is_user_site_wide_or_intranet_admin $user_id]
-    
+
+    if {[im_security_alert_check_alphanum -location im_timesheet_task_list_component -value $view_name]} { set view_name "im_timesheet_task_list" }
+
     set include_subprojects 0
     
     # Is this a "Consulting Project"?
@@ -210,7 +212,8 @@ ad_proc -public im_timesheet_task_list_component {
     
     # Is the current user allowed to edit the timesheet task hours?
     set edit_task_estimates_p [im_permission $user_id edit_timesheet_task_estimates]
-    
+    set edit_task_completion_p [im_permission $user_id edit_timesheet_task_completion]
+
     # ---------------------- Defaults ----------------------------------
     
     # Get parameters from HTTP session
@@ -238,7 +241,7 @@ ad_proc -public im_timesheet_task_list_component {
     if {![exists_and_not_null return_url]} { set return_url $current_url }
     
     # Get the "view" (=list of columns to show)
-    set view_id [util_memoize [list db_string get_view_id "select view_id from im_views where view_name = '$view_name'" -default 0]]
+    set view_id [im_view_id_from_name $view_name]
     if {0 == $view_id} {
         ns_log Error "im_timesheet_task_component: we didn't find view_name=$view_name"
         set view_id [db_string get_view_id "select view_id from im_views where view_name='im_timesheet_task_list'"]
@@ -494,6 +497,7 @@ ad_proc -public im_timesheet_task_list_component {
 				pp.tree_sortkey between child.tree_sortkey and tree_right(child.tree_sortkey) and
 				pp.project_type_id = [im_project_type_task]
 		) as billable_units,
+		(select coalesce(count(*), 0) from acs_rels r where r.object_id_one = child.project_id and r.object_id_two = :user_id) as assigned_member_p,
 		to_char(child.reported_hours_cache, :number_format) as reported_hours_cache_pretty,
 		to_char(child.reported_days_cache, :number_format) as reported_days_cache_pretty,
 		im_biz_object_member__list(child.project_id) as project_member_list,
@@ -660,12 +664,16 @@ ad_proc -public im_timesheet_task_list_component {
 	if {0 == $reported_days_cache_pretty} { set reported_days_cache_pretty "" }
 
 	# Select the "reported_units" depending on the Unit of Measure
-	# of the task. 320="Hour", 321="Day". Don't show anything if
-	# UoM is not hour or day.
+	# of the task. 320="Hour", 321="Day". 
 	switch $uom_id {
 	    320 { set reported_units_cache $reported_hours_cache_pretty }
 	    321 { set reported_units_cache $reported_days_cache_pretty }
-	    default { set reported_units_cache [lang::message::lookup "" intranet-timesheet2-tasks.Invalid_UoM_uom "Invalid UoM '%uom%'"] }
+	    default { 
+		# Fraber 140326: Use hours as default when nothing is specified (a sub-project...)
+		# set reported_units_cache [lang::message::lookup "" intranet-timesheet2-tasks.Invalid_UoM_uom "Invalid UoM '%uom%'"] 
+		set uom_id 320
+		set reported_units_cache $reported_hours_cache_pretty
+	    }
 	}
 	if {$debug} { ns_log Notice "im_timesheet_task_list_component: project_id=$project_id, hours=$reported_hours_cache, days=$reported_days_cache, units=$reported_units_cache" }
 
@@ -723,10 +731,21 @@ ad_proc -public im_timesheet_task_list_component {
 	    set material_id [im_material_default_material_id]
 	    set reported_units_cache $reported_hours_cache_pretty
 
-	    set percent_done_input $percent_completed_rounded
 	    set billable_hours_input $billable_units
 	    set planned_hours_input $planned_units
 	}
+
+	# Should the user be able to edit the %completed field?
+	# NEVER edit %completed if the task is a project - because project %compl are calculated
+	# YES if the user has write permissions
+	# YES if the user is assigned to the task and has the edit_task_completion_p privilege
+	if {[info exists parents_hash($task_id)]} { set percent_done_input $percent_completed_rounded }
+	if {$write || ($edit_task_completion_p && $assigned_member_p)} { 
+	    # User may write
+	} else {
+	    set percent_done_input $percent_completed_rounded 
+	}
+
 
 	set task_name_complete $task_name
 	set task_name "<nobr>[string range $task_name 0 [parameter::get -package_id [apm_package_id_from_key intranet-timesheet2-tasks] -parameter "DefaultLengthTaskName" -default 40]]</nobr>"
@@ -810,10 +829,12 @@ ad_proc -public im_timesheet_task_list_component {
 
     set action_options [list]
     set new_timesheet_task_html ""
+    if {$write || $edit_task_completion_p} {
+	lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Save_Changes "Save Changes"] "save"]
+    }
     if {$write} {
-		lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Save_Changes "Save Changes"] "save"]
-		lappend action_options [list [_ intranet-timesheet2-tasks.Delete] "delete"]
-		set new_timesheet_task_html "<a class='form-button40' href=\"[export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>"
+	lappend action_options [list [_ intranet-timesheet2-tasks.Delete] "delete"]
+	set new_timesheet_task_html "<a class='form-button40' href=\"[export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>"
     }
 
     lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Close "Close"] "close" ]
