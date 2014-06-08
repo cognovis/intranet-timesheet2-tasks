@@ -5,7 +5,6 @@
 #
 # All rights reserved. Please check
 # http://www.project-open.com/license/ for details.
-
 ad_page_contract {
     @param form_mode edit or display
     @author frank.bergmann@project-open.com
@@ -18,10 +17,9 @@ ad_page_contract {
     { message "" }
     { task_type_id "9500"}
     { task_status_id:integer 76 }
-
-    {submit_continue_tasklist ""}
-    {submit_continue_edit ""}
-    {submit_cancel ""}
+    { submit_continue_tasklist "" }
+    { submit_continue_edit "" }
+    { submit_cancel "" }
 }
 
 # ------------------------------------------------------------------
@@ -60,7 +58,6 @@ if {[info exists task_id]} {
 	}
     }
 }
-
 
 # Check the case if there is no project specified. 
 # This is only OK if there is a task_id specified (new task for project).
@@ -154,7 +151,7 @@ switch $button_pressed {
 # the select_query below will fail
 
 if {[info exists task_id]} {
-
+    
     set project_exists_p [db_string project_exists "
 	select	count(*)
 	from	im_projects
@@ -177,9 +174,9 @@ if {[info exists task_id]} {
 			:task_id, :default_material_id, [im_uom_hour]
 		)
 	"
-
+	
     }
-
+    
 }
 
 # ------------------------------------------------------------------
@@ -188,7 +185,6 @@ if {[info exists task_id]} {
 
 set type_options [im_timesheet_task_type_options -include_empty 0]
 set material_options [im_material_options -include_empty 0]
-
 set company_id ""
 if {[info exists project_id]} { set company_id [db_string cid "select company_id from im_projects where project_id = :project_id" -default ""] }
 set parent_project_options [im_project_options \
@@ -335,25 +331,25 @@ ad_form -extend -name task -on_request {
 	# Set default Material to most used Material
 	set material_id $default_material_id
     }
-
+    
     set task_nr [string tolower $task_nr]
     if {[info exists start_date]} {set start_date [template::util::date get_property sql_date $start_date]}
     if {[info exists end_date]} {set end_date [template::util::date get_property sql_timestamp $end_date]}
-
+    
     if {[catch {
-
+	
 	db_string task_insert {}
 	db_dml project_update {}
-
+	
         im_dynfield::attribute_store \
             -object_type "im_timesheet_task" \
             -object_id $task_id \
             -form_id task
-
+	
 	# Add the users of the parent_project to the ts-task
 	set pm_role_id [im_biz_object_role_project_manager]
 	im_biz_object_add_role $current_user_id $task_id $pm_role_id
-
+	
 	if {$add_parent_project_members_to_new_task_p} {
 	    set member_sql "
 		select	object_id_two as user_id,
@@ -363,32 +359,32 @@ ad_form -extend -name task -on_request {
 		where	r.rel_id = bom.rel_id and
 			object_id_one = :project_id
 	"
-	db_foreach members $member_sql {
-	    im_biz_object_add_role $user_id $task_id $role_id
+	    db_foreach members $member_sql {
+		im_biz_object_add_role $user_id $task_id $role_id
+	    }
 	}
-    }
+	
+	# Write Audit Trail
+	im_project_audit -project_id $task_id -action after_create
+	
+	# Update percent_completed
+	im_timesheet_project_advance $task_id
 
-    # Write Audit Trail
-    im_project_audit -project_id $task_id -action after_create
-
-    # Update percent_completed
-    im_timesheet_project_advance $task_id
-
-    # Send a notification for this task
-    set params [list  [list base_url "/intranet-timesheet2-tasks/"]  [list task_id $task_id] [list return_url ""] [list no_write_p 1]]
-    
-    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/task-info"]
-    set task_url [export_vars -base "[ad_url]/intranet-timesheet2-tasks/view" -url {task_id}]
-    notification::new \
-        -type_id [notification::type::get_type_id -short_name project_notif] \
-        -object_id $project_id \
-        -response_id "" \
-        -notif_subject "New Task: $task_name" \
-        -notif_html "<h1><a href='$task_url'>$task_name</h1><p /><div align=left>[string trim $result]</div>"
-
-    # Reset the time_phase date for this relationship
-    im_biz_object_delete_timephased_data -task_id $task_id
-
+	# Send a notification for this task
+	set params [list  [list base_url "/intranet-timesheet2-tasks/"]  [list task_id $task_id] [list return_url ""] [list no_write_p 1]]
+	
+	set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/task-info"]
+	set task_url [export_vars -base "[ad_url]/intranet-timesheet2-tasks/view" -url {task_id}]
+	notification::new \
+	    -type_id [notification::type::get_type_id -short_name project_notif] \
+	    -object_id $project_id \
+	    -response_id "" \
+	    -notif_subject "New Task: $task_name" \
+	    -notif_html "<h1><a href='$task_url'>$task_name</h1><p /><div align=left>[string trim $result]</div>"
+	
+	# Reset the time_phase date for this relationship
+	im_biz_object_delete_timephased_data -task_id $task_id
+    }]} {ad_return_error "hel" "help"}
 } -edit_data {
 
     if {!$project_write} {
@@ -399,9 +395,9 @@ ad_form -extend -name task -on_request {
     set task_nr [string tolower $task_nr]
     if {[info exists start_date]} {set start_date [template::util::date get_property sql_date $start_date]}
     if {[info exists end_date]} {set end_date [template::util::date get_property sql_timestamp $end_date]}
-
+    
     db_dml project_update {}
-
+    
     im_dynfield::attribute_store \
 	-object_type "im_timesheet_task" \
 	-object_id $task_id \
