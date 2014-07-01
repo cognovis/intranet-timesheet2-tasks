@@ -290,8 +290,20 @@ switch $action {
 
 	    # Close the ticket
 	    switch $project_type_id {
-		100 - 101 {
-		    # 100=task, 101=ticket
+		100 {
+		    # 100=task
+
+		    # Close the task if the user has write permissions or is explicitely assigned to the task
+		    if {$write || $assigned_p} {
+			db_dml close_task "update im_projects set project_status_id = [im_project_status_closed] where project_id = :project_id"
+			db_dml close_task "update im_timesheet_tasks set task_status_id = [im_timesheet_task_status_closed] where task_id = :project_id"
+			im_project_audit -project_id $project_id
+		    } else {
+			append mark_as_done_html "<li>You don't have permission to close project/task #$project_id.\n"
+		    }
+		}
+		101 {
+		    101=ticket
 
 		    # Close the task if the user has write permissions or is explicitely assigned to the task
 		    if {$write || $assigned_p} {
