@@ -477,6 +477,9 @@ ad_proc -public im_timesheet_task_list_component {
         project_nr { 
             set order_by_clause "lower(child.project_nr)" 
         }
+	priority {
+	    set order_by_clause "lower(child.priority)"
+	}
         default {
             set order_by_clause "''" 
         }
