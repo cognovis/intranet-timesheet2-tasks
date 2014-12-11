@@ -1103,6 +1103,25 @@ ad_proc -public im_timesheet_task_home_component {
 }
 
 
+ad_proc -public im_timesheet_task_project_component {
+    -project_id 
+    {-page_size 20}
+    {-restrict_to_status_id 76}
+    {-return_url ""}
+} {
+
+    @creation-date 2011-01-12
+} {
+
+    # set the page variable (hopefully)
+    set page [ns_queryget page 1]
+    set orderby [ns_queryget orderby priority]
+    set params [list [list base_url "/intranet-timesheet2-tasks/"] [list page_size $page_size] [list restrict_to_status_id $restrict_to_status_id] [list orderby $orderby] [list page $page] [list project_id $project_id] [list return_url $return_url]]
+
+    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/home-tasks"]
+    return [string trim $result]
+}
+
 
 
 # -------------------------------------------------------------------
