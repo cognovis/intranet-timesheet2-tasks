@@ -562,7 +562,7 @@ ad_proc -public im_timesheet_task_list_component {
     ns_log Debug "im_timesheet_task_list_component: starting to sort multirow"
 
     if {[catch {
-	if {"sort_order" == $order_by} {
+	if {"sort_order" == $order_by || "priority" == $order_by} {
 	    multirow_sort_tree -integer task_list_multirow project_id parent_id order_by_value
 	} else {
 	    multirow_sort_tree task_list_multirow project_id parent_id order_by_value
