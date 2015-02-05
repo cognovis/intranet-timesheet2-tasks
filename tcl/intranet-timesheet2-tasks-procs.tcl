@@ -1364,10 +1364,10 @@ ad_proc -public -callback im_project_after_update -impl im_timesheet_tasks {
     Updates tasks status on im_projects table according with im_timesheet_tasks table.
 } {
 
-    set closed_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_closed])"] 3600]
-    set active_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_active])"] 3600]
-    set inactive_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_inactive])"] 3600]
-    set potential_status_ids [util_memoize [list db_list task_status "select * from im_sub_categories([im_timesheet_task_status_potential])"] 3600]
+    set closed_status_ids [im_sub_categories [im_timesheet_task_status_closed]]
+    set active_status_ids [im_sub_categories [im_timesheet_task_status_active]]
+    set inactive_status_ids  [im_sub_categories [im_timesheet_task_status_inactive]]
+    set potential_status_ids  [im_sub_categories [im_timesheet_task_status_potential]]
 
     if {[lsearch $closed_status_ids $status_id] >=0} {
 	set project_status_id [im_project_status_closed]
