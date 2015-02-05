@@ -477,6 +477,9 @@ ad_proc -public im_timesheet_task_list_component {
         project_nr { 
             set order_by_clause "lower(child.project_nr)" 
         }
+	priority {
+	    set order_by_clause "t.priority"
+	}
         default {
             set order_by_clause "''" 
         }
@@ -559,7 +562,7 @@ ad_proc -public im_timesheet_task_list_component {
     ns_log Debug "im_timesheet_task_list_component: starting to sort multirow"
 
     if {[catch {
-	if {"sort_order" == $order_by} {
+	if {"sort_order" == $order_by || "priority" == $order_by} {
 	    multirow_sort_tree -integer task_list_multirow project_id parent_id order_by_value
 	} else {
 	    multirow_sort_tree task_list_multirow project_id parent_id order_by_value
@@ -837,7 +840,7 @@ ad_proc -public im_timesheet_task_list_component {
 	set new_timesheet_task_html "<a class='form-button40' href=\"[export_vars -base "/intranet-timesheet2-tasks/new" {{project_id $restrict_to_project_id} {return_url $current_url}}]\">[_ intranet-timesheet2-tasks.New_Timesheet_Task]</a>"
     }
 
-    lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Close "Close"] "close" ]
+    # lappend action_options [list [lang::message::lookup "" intranet-timesheet2-tasks.Close "Close"] "close" ]
 
     set action_html "
 	<tr>
@@ -1099,6 +1102,25 @@ ad_proc -public im_timesheet_task_home_component {
     return [string trim $result]
 }
 
+
+ad_proc -public im_timesheet_task_project_component {
+    -project_id 
+    {-page_size 20}
+    {-restrict_to_status_id 76}
+    {-return_url ""}
+} {
+
+    @creation-date 2011-01-12
+} {
+
+    # set the page variable (hopefully)
+    set page [ns_queryget page 1]
+    set orderby [ns_queryget orderby priority]
+    set params [list [list base_url "/intranet-timesheet2-tasks/"] [list page_size $page_size] [list restrict_to_status_id $restrict_to_status_id] [list orderby $orderby] [list page $page] [list project_id $project_id] [list return_url $return_url]]
+
+    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/home-tasks"]
+    return [string trim $result]
+}
 
 
 

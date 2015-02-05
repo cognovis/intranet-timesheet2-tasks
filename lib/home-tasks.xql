@@ -30,7 +30,7 @@
         im_timesheet_tasks t
         WHERE t.task_id = p.project_id
         AND p.parent_id = parent.project_id
-        AND p.project_id in (select object_id_one from acs_rels where object_id_two = [ad_conn user_id])
+        $project_filter_sql
         AND p.project_status_id in ([join [im_sub_categories $restrict_to_status_id] ","])
         AND [template::list::page_where_clause -name "tasks"]
 	[template::list::orderby_clause -orderby -name "tasks"]
@@ -60,7 +60,7 @@
         im_timesheet_tasks t
         WHERE t.task_id = p.project_id
         AND p.parent_id = parent.project_id
-        AND p.project_id in (select object_id_one from acs_rels where object_id_two = [ad_conn user_id])
+        $project_filter_sql
         AND p.project_status_id in ([join [im_sub_categories $restrict_to_status_id] ","])
 	[template::list::orderby_clause -orderby -name "tasks"]
     </querytext>
