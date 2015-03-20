@@ -2,6 +2,12 @@ if ![info exists page_size] {
     set page_size 25
 } 
 
+if ![info exists project_id] {
+    set project_filter_sql "AND p.project_id in (select object_id_one from acs_rels where object_id_two = [ad_conn user_id])"
+} else {
+    set project_filter_sql "AND p.parent_id = :project_id"
+}
+
 template::list::create \
     -name tasks \
     -multirow tasks \
@@ -47,7 +53,6 @@ template::list::create \
     -page_size $page_size \
     -page_flush_p 0 \
     -page_query_name tasks_pagination
-
 
 db_multirow -extend {project_url task_url timesheet_report_url} tasks select_tasks {} {
    
