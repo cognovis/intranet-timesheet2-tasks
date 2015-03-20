@@ -471,6 +471,10 @@ ad_proc -public im_timesheet_task_list_component {
             # Order by which tasks starts first
             set order_by_clause "child.start_date" 
         }
+        end_date { 
+            # Order by which end date is closest
+            set order_by_clause "child.end_date" 
+        }
         project_name { 
             set order_by_clause "lower(child.project_name)" 
         }
