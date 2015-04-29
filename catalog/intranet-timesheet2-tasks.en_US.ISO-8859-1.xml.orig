@@ -9,7 +9,7 @@
   <msg key="Bll">Bll</msg>
   <msg key="CC">CC</msg>
   <msg key="Cost_Center">Cost Center</msg>
-  <msg key="Delete">Löschen</msg>
+  <msg key="Delete">Delete</msg>
   <msg key="Dependency_Type">Type</msg>
   <msg key="Dependent_Objects_Exist">&quot;Dependent Objects&quot; (such as timesheet entries, ...) exist for atleast one of the tasks: &lt;br&gt;
 
@@ -40,19 +40,18 @@
   <msg key="Material">Material</msg>
   <msg key="Members">Members</msg>
   <msg key="Name">Name</msg>
-  <msg key="New_Timesheet_Task">Neue Aufgaben</msg>
+  <msg key="New_Timesheet_Task">New Timesheet Task</msg>
   <msg key="No_permission_to_delete_a_task">You don't have the permission to delete a task.</msg>
   <msg key="Note">Note</msg>
   <msg key="Percentage_completed">Percentage completed</msg>
   <msg key="Plan">Plan</msg>
   <msg key="Planned_Units">Planned Units</msg>
   <msg key="Pln">Pln</msg>
-  <msg key="Save_Changes">Änderungen speichern</msg>
+  <msg key="Save_Changes">Save Changes</msg>
   <msg key="Short_Name">Short Name</msg>
   <msg key="Short_Name_too_long">Nummer zu lang (max. 30 Zeichen)</msg>
   <msg key="Showing">Showing tasks %task_start_idx_pretty% to %task_end_idx_pretty%</msg>
   <msg key="Showing_tasks_start_idx_how_many">Showing tasks %task_start_idx_pretty% to %task_end_idx_pretty%</msg>
-  <msg key="SplitUpTaskExplain">This feature converts a task into a sub project. To preserve 'Planned Units' please distribute the units to the newly to be created tasks below.</msg>
   <msg key="Start">Start</msg>
   <msg key="Status">Status</msg>
   <msg key="Task_Code">Task Code</msg>

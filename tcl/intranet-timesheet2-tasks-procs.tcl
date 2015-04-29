@@ -1127,6 +1127,23 @@ ad_proc -public im_timesheet_task_project_component {
 }
 
 
+# ----------------------------------------------------------------------
+# Convert to Subproject component
+# ---------------------------------------------------------------------
+
+
+ad_proc -public im_timesheet_task_convert_to_subproject_component {
+    -task_id
+} {
+
+
+    set params [list  [list base_url "/intranet-timesheet2-tasks/"]  [list task_id $task_id]]
+
+    set result [ad_parse_template -params $params "/packages/intranet-timesheet2-tasks/lib/convert-task-to-subproject"]
+
+    return [string trim $result]
+}
+
 
 # -------------------------------------------------------------------
 # Calculate Project Advance
