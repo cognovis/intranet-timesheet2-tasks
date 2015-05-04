@@ -388,9 +388,10 @@ ad_form -extend -name task -on_request {
 } -edit_data {
 
     if {!$project_write} {
-	ad_return_complaint 1 "You have insufficient privileges to add/modify timesheet tasks for this project"
-	ad_script_abort
+        	ad_return_complaint 1 "You have insufficient privileges to add/modify timesheet tasks for this project"
+        	ad_script_abort
     }
+
 
     set task_nr [string tolower $task_nr]
     if {[info exists start_date]} {set start_date [template::util::date get_property sql_date $start_date]}
@@ -399,9 +400,9 @@ ad_form -extend -name task -on_request {
     db_dml project_update {}
     
     im_dynfield::attribute_store \
-	-object_type "im_timesheet_task" \
-	-object_id $task_id \
-	-form_id task
+        	-object_type "im_timesheet_task" \
+        	-object_id $task_id \
+        	-form_id task
 
     # Write Audit Trail
     im_project_audit -project_id $task_id -action after_update

@@ -24,11 +24,11 @@ set object_type_id $task(object_type_id)
 set old_section ""
 
 db_multirow -extend {attrib_var value} task_info dynfield_attribs_sql "
-      select
+      select distinct
       		aa.pretty_name,
       		aa.attribute_name,
                 tam.section_heading,
-                w.widget, w.widget_name
+                w.widget, w.widget_name, la.pos_y
       from
       		im_dynfield_widgets w,
       		acs_attributes aa,
@@ -57,23 +57,23 @@ db_multirow -extend {attrib_var value} task_info dynfield_attribs_sql "
     set pretty_name [lang::message::lookup "" $pretty_name_key $pretty_name]
 
     if {$widget eq "richtext"} {
-	set value [template::util::richtext::get_property contents $value]
+        	set value [template::util::richtext::get_property contents $value]
     }
 
     # Set the value
     if {[info exists task($attribute_name)]} { 
-	set value $task($attribute_name)
+        	set value $task($attribute_name)
     } else {
-	set value ""
+        	set value ""
     }
 
     if {$attribute_name eq "material_id"} {
-	set material_id $task(material_id)
-	if {[string is integer $material_id]} {
-	    set value [db_string material_name "select material_name from im_materials where material_id = $task(material_id)"]
-	} else {
-	    set value $material_id
-	}
+        	set material_id $task(material_id)
+        	if {[string is integer $material_id]} {
+        	    set value [db_string material_name "select material_name from im_materials where material_id = $task(material_id)"]
+        	} else {
+        	    set value $material_id
+        	}
     }
 
 }
